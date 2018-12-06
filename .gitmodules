@@ -1,0 +1,3 @@
+[submodule "packaging/lambdajl"]
+	path = packaging/lambdajl
+	url = https://github.com/samoconnor/lambdajl

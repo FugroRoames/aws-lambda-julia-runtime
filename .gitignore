@@ -1,0 +1,3 @@
+.vscode
+packaging/bundle
+packaging/aws-lambda-julia-runtime-*.zip
