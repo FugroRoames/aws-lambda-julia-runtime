@@ -4,6 +4,7 @@ JL_VERSION := $(JL_VERSION_BASE).$(JL_VERSION_PATCH)
 
 IMAGE_NAME := roames/lambda_julia_runtime_build:$(JL_VERSION)
 BUNDLE := aws-lambda-julia-runtime-$(JL_VERSION).zip
+LAMBDA_MODULE := word_count
 
 .PHONY: default
 default: help
@@ -23,9 +24,12 @@ build-runtime:
 	-@rm -rf $(CURDIR)/packaging/bundle/
 	@mkdir -p $(CURDIR)/packaging/bundle
 	@cp src/* $(CURDIR)/packaging/bundle/
+	@mkdir -p $(CURDIR)/packaging/bundle/$(LAMBDA_MODULE)/
+	@cp examples/word_count.jl $(CURDIR)/packaging/bundle/$(LAMBDA_MODULE)/
 	@docker build \
 		--build-arg JL_VERSION_BASE=$(JL_VERSION_BASE) \
 		--build-arg JL_VERSION_PATCH=$(JL_VERSION_PATCH) \
+		--build-arg LAMBDA_MODULE=$(LAMBDA_MODULE) \
 		-t $(IMAGE_NAME) packaging
 	-@rm -rf $(CURDIR)/packaging/bundle/
 	@docker run --rm -it -v "$(CURDIR)/packaging:/var/host" $(IMAGE_NAME) zip --symlinks -r -9 /var/host/$(BUNDLE) .

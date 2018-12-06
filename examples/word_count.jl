@@ -11,10 +11,12 @@ using AWSLambdaJuliaRuntime
 using AWSS3
 
 #= The handler function =#
-function handle(event_data::InvocationRequest)
+function handler(event_data::InvocationRequest)
 	# download some file from S3 path
 	# count number of unique words
 	# put result back to S3 path or send in response
+
+	println("Hello World : $(event_data.payload)")
 
 	i_am_good = true
 	if i_am_good

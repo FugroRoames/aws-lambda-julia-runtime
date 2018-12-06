@@ -8,8 +8,19 @@ set -euo pipefail
 
 CLIENT_MODULE=$(echo $_HANDLER | cut -d. -f1)
 
+# DEBUG - REMOVE LATER
+echo "AWS Lambda Julia Runtime"
+env
+echo "========================"
+pwd
+
+ls -la ${LAMBDA_TASK_ROOT}
+ls -la ${LAMBDA_TASK_ROOT}/bin/
+echo "================================="
+######################
+
 ${LAMBDA_TASK_ROOT}/bin/julia -i -e \
 	"using AWSLambdaJuliaRuntime; " \
-	"using mod_${_HANDLER}; " \
+	"using ${CLIENT_MODULE}; " \
 	"AWSLambdaJuliaRuntime.main(${CLIENT_MODULE});"
 

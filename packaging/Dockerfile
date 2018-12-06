@@ -7,6 +7,8 @@ FROM octech/lambdajl:$JL_VERSION
 ARG JL_VERSION
 ARG JL_VERSION_BASE
 
+ARG LAMBDA_MODULE
+
 # For https://github.com/samoconnor/InfoZIP.jl
 ENV HAVE_INFOZIP=1
 
@@ -19,6 +21,9 @@ RUN julia -e 'Pkg.update(); Pkg.resolve()'
 COPY bundle/AWSLambdaJuliaRuntime.jl \
 	/var/task/julia/v$JL_VERSION_BASE/AWSLambdaJuliaRuntime/src/
 
+# Copying lambda function code
+COPY bundle/$LAMBDA_MODULE/* \
+	/var/task/julia/v$JL_VERSION_BASE/$LAMBDA_MODULE/src/
 
 # Install bootstrap
 COPY bootstrap /var/task/bootstrap
@@ -29,6 +34,7 @@ RUN mkdir -p /tmp/julia/sys                                                 && \
 	julia -e '                                                                 \
 		open("/tmp/julia/userimg.jl", "w") do f;                               \
 			println(f,"using AWSLambdaJuliaRuntime");                          \
+			println(f,"using word_count");                                     \
 			for p in eachline(joinpath(Pkg.dir(), "REQUIRE"))                  \
 				println(f, "using $p")                                         \
 			end                                                                \

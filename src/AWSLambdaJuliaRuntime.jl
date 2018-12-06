@@ -207,7 +207,7 @@ function main(lambda_module::Module)
         retries = 0
 
         ## Call handler function in the client module
-        handler_resp = lambda_module.handle(invoc_req)
+        handler_resp = lambda_module.handler(invoc_req)
 
         ## Send the response
         # curl -X POST "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response"  -d "$RESPONSE"
