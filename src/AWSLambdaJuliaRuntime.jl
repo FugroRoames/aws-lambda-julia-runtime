@@ -197,7 +197,6 @@ end
 main entry point to the module
 This gets called by the `bootstrap` script
 """
-# function main(lambda_module::Module, handler_name::String="handler")
 function main(lambda_module::Module)
     # Initialise runtime
     initialise()
@@ -220,7 +219,6 @@ function main(lambda_module::Module)
 
         ## Call handler function in the client module
         handler_resp = lambda_module.handler(invoc_req)
-        ## handler_resp = eval(parse("lambda_module.$(handler_name)(invoc_req)"))
 
         ## Send the response
         post_handler_response(handler_resp, invoc_req)
@@ -241,3 +239,4 @@ precompile(get_time_remaining, (InvocationRequest,))
 precompile(http_resp_success, (Integer,))
 
 end # module AWSLambdaJuliaRuntime
+

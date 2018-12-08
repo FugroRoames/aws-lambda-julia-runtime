@@ -8,5 +8,4 @@ set -euo pipefail
 CLIENT_MODULE=$(echo $_HANDLER | cut -d. -f1)
 CLIENT_HANDLER=$(echo $_HANDLER | cut -d. -f2)
 
-#${LAMBDA_TASK_ROOT}/bin/julia -e "using AWSLambdaJuliaRuntime; using ${CLIENT_MODULE}; AWSLambdaJuliaRuntime.main(${CLIENT_MODULE}, ${CLIENT_HANDLER});"
 ${LAMBDA_TASK_ROOT}/bin/julia -e "using AWSLambdaJuliaRuntime; using ${CLIENT_MODULE}; AWSLambdaJuliaRuntime.main(${CLIENT_MODULE});"
