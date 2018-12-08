@@ -1,7 +1,6 @@
 #!/bin/bash
 
 ## bootstrap - Entry point of AWS Lambda Julia runtime
-## 2018 (C) Fugro ROAMES <marines@roames.com.au>
 
 
 set -euo pipefail

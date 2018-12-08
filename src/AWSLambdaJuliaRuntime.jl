@@ -1,5 +1,4 @@
 ## AWS Lambda Runtime for Julia Lang
-## 2018 (C) Fugro ROAMES <marines@roames.com.au>
 
 
 # AWS Lambda Runtime Interface - https://docs.aws.amazon.com/lambda/latest/dg/runtimes-api.html
@@ -64,6 +63,7 @@ function get_time_remaining(req::InvocationRequest)
     return (time() / 1000) - req.deadline
 end
 
+# InvocationResponse represents response from the lambda invocation
 mutable struct InvocationResponse
      # The output of the function which is sent to the lambda caller.
     payload::String
@@ -112,7 +112,6 @@ function initialise()
 
     AWS_LAMBDA_RUNTIME_API = get(ENV, "AWS_LAMBDA_RUNTIME_API", nothing)
     if AWS_LAMBDA_RUNTIME_API == nothing
-        # TODO: send init error
         @error "[AWSLambdaJuliaRuntime] AWS_LAMBDA_RUNTIME_API not defined!"
         error("[AWSLambdaJuliaRuntime] AWS_LAMBDA_RUNTIME_API not defined!")
     end
@@ -127,7 +126,6 @@ function get_next_event()
     resp = HTTP.request("GET", AWS_LAMBDA_RUNTIME_API_NEXT_ENDPOINT; readtimeout=5, retry=true, retries=2)
     @debug "[AWSLambdaJuliaRuntime] get_next_event : event=" resp
     if !http_resp_success(resp.status)
-        # error
         return resp.status, nothing
     end
 
@@ -184,6 +182,7 @@ function post_handler_response(handler_resp::InvocationResponse, invoc_req::Invo
     push!(headers, Pair("content-length", string(length(handler_resp.payload))))
 
     @debug "[AWSLambdaJuliaRuntime] Posting response url=$(url) headers=$(headers) payload=$(handler_resp.payload)"
+
     resp = HTTP.request("POST", url, headers, handler_resp.payload)
 
     if !http_resp_success(resp.status)
@@ -210,8 +209,6 @@ function main(lambda_module::Module)
     # In (infinite) loop, process Lambda invocations
     while retries < max_retries
         ## Get an event
-        # invoc_req=$(curl -sS -LD "$HEADERS" -X GET "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next")
-        # REQUEST_ID=$(grep -Fi Lambda-Runtime-Aws-Request-Id "$HEADERS" | tr -d '[:space:]' | cut -d: -f2)
         resp_status, invoc_req = get_next_event()
         if !http_resp_success(resp_status)
             @error "[AWSLambdaJuliaRuntime] get_next_event failed: code=$(resp_status) req=" invoc_req
@@ -226,7 +223,6 @@ function main(lambda_module::Module)
         ## handler_resp = eval(parse("lambda_module.$(handler_name)(invoc_req)"))
 
         ## Send the response
-        # curl -X POST "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response"  -d "$RESPONSE"
         post_handler_response(handler_resp, invoc_req)
     end
 
