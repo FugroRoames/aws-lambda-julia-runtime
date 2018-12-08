@@ -1,3 +1,6 @@
 julia 0.6.1
 HTTP
 JSON
+MicroLogging
+AWSCore
+AWSS3

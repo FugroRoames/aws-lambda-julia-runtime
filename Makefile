@@ -20,7 +20,7 @@ build-base:
 ## Build runtime
 build-runtime:
 	@echo '$(GREEN)Building runtime...$(RESET)'
-	-@rm -f $(CURDIR)/$(BUNDLE)
+	-@rm -f $(CURDIR)/packaging/$(BUNDLE)
 	-@rm -rf $(CURDIR)/packaging/bundle/
 	@mkdir -p $(CURDIR)/packaging/bundle
 	@cp src/* $(CURDIR)/packaging/bundle/

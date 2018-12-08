@@ -25,8 +25,6 @@ COPY bundle/AWSLambdaJuliaRuntime.jl \
 COPY bundle/$LAMBDA_MODULE/* \
 	/var/task/julia/v$JL_VERSION_BASE/$LAMBDA_MODULE/src/
 
-# Install bootstrap
-COPY bootstrap /var/task/bootstrap
 
 
 # Recompile sys.so with required packages.
@@ -78,6 +76,9 @@ RUN find julia -name '.git' \
 	-o -name 'META_BRANCH' \
 	| xargs rm -rf
 
+
+# Install bootstrap
+COPY bootstrap /var/task/bootstrap
 
 # Start fresh with build container to bundle up the runtime
 FROM lambci/lambda:build-python2.7

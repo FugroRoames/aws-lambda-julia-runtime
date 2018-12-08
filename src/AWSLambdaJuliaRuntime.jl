@@ -13,6 +13,7 @@ module AWSLambdaJuliaRuntime
 
 using HTTP
 using JSON
+using MicroLogging
 
 export success_invocation_response,
        failure_invocation_response,
@@ -30,6 +31,7 @@ const COGNITO_IDENTITY_HEADER = "Lambda-Runtime-Cognito-Identity"
 const DEADLINE_MS_HEADER = "Lambda-Runtime-Deadline-Ms"
 const FUNCTION_ARN_HEADER = "Lambda-Runtime-Invoked-Function-Arn"
 
+# InvocationRequest represent Lambda invocation request data
 mutable struct InvocationRequest
     # The user's payload represented as a UTF-8 string.
     payload::String
@@ -51,6 +53,10 @@ mutable struct InvocationRequest
 
     # Function execution deadline counted in milliseconds since the Unix epoch.
     deadline::UInt64
+
+    function InvocationRequest()
+        return new("", "", "", "", "", "", 0)
+    end
 end
 
 # The number of milliseconds left before lambda terminates the current execution.
@@ -91,7 +97,7 @@ function failure_invocation_response(err_msg::String, err_type::String)
 end
 
 function http_resp_success(http_code::Integer)
-    return http_code >> 200 && http_code << 299
+    return ((http_code >= 200) && (http_code <= 299))
 end
 
 function initialise()
@@ -99,26 +105,36 @@ function initialise()
     global AWS_LAMBDA_RUNTIME_API_NEXT_ENDPOINT
     global AWS_LAMBDA_RUNTIME_API_RESULTS_ENDPOINT
 
+    LOG_LEVEL = get(ENV, "JULIA_RUNTIME_LOG_LEVEL", "error")
+    configure_logging(AWSLambdaJuliaRuntime, min_level=parse(LOG_LEVEL))
+
+    @info "[AWSLambdaJuliaRuntime] Initialising..."
 
     AWS_LAMBDA_RUNTIME_API = get(ENV, "AWS_LAMBDA_RUNTIME_API", nothing)
     if AWS_LAMBDA_RUNTIME_API == nothing
         # TODO: send init error
-        return
+        @error "[AWSLambdaJuliaRuntime] AWS_LAMBDA_RUNTIME_API not defined!"
+        error("[AWSLambdaJuliaRuntime] AWS_LAMBDA_RUNTIME_API not defined!")
     end
-    AWS_LAMBDA_RUNTIME_API_INIT_ENDPOINT = HTTP.escapepath("http://$(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/init/error")
-    AWS_LAMBDA_RUNTIME_API_NEXT_ENDPOINT = HTTP.escapepath("http://$(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/invocation/next")
-    AWS_LAMBDA_RUNTIME_API_RESULTS_ENDPOINT = HTTP.escapepath("http://$(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/invocation/")
+    AWS_LAMBDA_RUNTIME_API_INIT_ENDPOINT = "http://$(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/init/error"
+    AWS_LAMBDA_RUNTIME_API_NEXT_ENDPOINT = "http://$(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/invocation/next"
+    AWS_LAMBDA_RUNTIME_API_RESULTS_ENDPOINT = "http://$(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/invocation/"
 
+    @info "[AWSLambdaJuliaRuntime] Initialised"
 end
 
 function get_next_event()
     resp = HTTP.request("GET", AWS_LAMBDA_RUNTIME_API_NEXT_ENDPOINT; readtimeout=5, retry=true, retries=2)
+    @debug "[AWSLambdaJuliaRuntime] get_next_event : event=" resp
     if !http_resp_success(resp.status)
         # error
         return resp.status, nothing
     end
 
     invoc_req = InvocationRequest()
+
+    # parse request body
+    invoc_req.payload = String(resp.body)
 
     # process request HTTP header
     for (k,v) in resp.headers
@@ -140,12 +156,10 @@ function get_next_event()
         if k == DEADLINE_MS_HEADER
             ms = parse(UInt64, String(v))
             invoc_req.deadline = ms * 1000 # deadline in mu sec
-            # TODO: log deadline
         end
     end
 
-    # parse request body
-    invoc_req.payload = String(resp.body)
+    @debug "[AWSLambdaJuliaRuntime] Received event: " invoc_req
 
     if invoc_req.request_id == nothing
         return -1, invoc_req
@@ -154,7 +168,10 @@ function get_next_event()
     return resp.status, invoc_req
 end
 
+# Send back the result of lambda invocation (success or failure)
 function post_handler_response(handler_resp::InvocationResponse, invoc_req::InvocationRequest)
+    @debug "[AWSLambdaJuliaRuntime] post_handler_response handler_resp=" handler_resp
+
     url = ""
     if handler_resp.success
         url = "$(AWS_LAMBDA_RUNTIME_API_RESULTS_ENDPOINT)$(invoc_req.request_id)/response"
@@ -164,15 +181,13 @@ function post_handler_response(handler_resp::InvocationResponse, invoc_req::Invo
 
     headers = Vector{Pair{String, String}}()
     push!(headers, Pair("content-type", handler_resp.content_type))
-    push!(headers, Pair("Expect", ""))
-    push!(headers, Pair("transfer-encoding", ""))
     push!(headers, Pair("content-length", string(length(handler_resp.payload))))
 
-    resp = HTTP.request("POST", url, headers, handler_resp)
+    @debug "[AWSLambdaJuliaRuntime] Posting response url=$(url) headers=$(headers) payload=$(handler_resp.payload)"
+    resp = HTTP.request("POST", url, headers, handler_resp.payload)
 
     if !http_resp_success(resp.status)
-        # TODO: error
-        println("ERROR! Post response failed. error=$(resp.status) resp=$(resp.body)")
+        @error "[AWSLambdaJuliaRuntime] Post response failed. error=$(resp.status) resp=$(resp.body)"
         return
     end
 
@@ -183,9 +198,9 @@ end
 main entry point to the module
 This gets called by the `bootstrap` script
 """
+# function main(lambda_module::Module, handler_name::String="handler")
 function main(lambda_module::Module)
     # Initialise runtime
-    println("Initialising AWSLambdaJuliaRuntime...")
     initialise()
 
     retries = 0
@@ -199,7 +214,7 @@ function main(lambda_module::Module)
         # REQUEST_ID=$(grep -Fi Lambda-Runtime-Aws-Request-Id "$HEADERS" | tr -d '[:space:]' | cut -d: -f2)
         resp_status, invoc_req = get_next_event()
         if !http_resp_success(resp_status)
-            println("ERROR! get_next failed: code=$(resp_status) req=$(invoc_req)")
+            @error "[AWSLambdaJuliaRuntime] get_next_event failed: code=$(resp_status) req=" invoc_req
             retries += 1
             continue
         end
@@ -208,6 +223,7 @@ function main(lambda_module::Module)
 
         ## Call handler function in the client module
         handler_resp = lambda_module.handler(invoc_req)
+        ## handler_resp = eval(parse("lambda_module.$(handler_name)(invoc_req)"))
 
         ## Send the response
         # curl -X POST "http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response"  -d "$RESPONSE"
@@ -215,7 +231,7 @@ function main(lambda_module::Module)
     end
 
     if retries == max_retries
-        println("[ERROR] Exhausted all retries ($(retries)/$(max_retries)). Exiting!")
+        @error "[AWSLambdaJuliaRuntime] Exhausted all retries ($(retries)/$(max_retries)). Exiting!"
     end
 end
 
